@@ -1,0 +1,17 @@
+*~
+pa1-data/*
+debug_output/*
+.DS_Store
+.classpath
+build.xml
+classes/*
+dev_output/*
+dev_queries/*
+extra_credit/*
+formatVerification.py
+memusg
+run.sh
+run_dev.sh
+task1/*
+task2/*
+toy_example/*
