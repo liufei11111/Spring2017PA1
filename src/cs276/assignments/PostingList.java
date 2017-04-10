@@ -26,4 +26,12 @@ public class PostingList {
   public List<Integer> getList() {
     return this.postings;
   }
+
+  public String toString(){
+    String postingsString = "";
+    for ( Integer posting : postings){
+      postingsString +=" "+posting;
+    }
+    return String.format("%s: [%s]",termId,postingsString);
+  }
 }

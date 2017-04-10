@@ -3,7 +3,8 @@ package cs276.assignments;
 import java.nio.channels.FileChannel;
 import java.nio.ByteBuffer;
 import java.io.IOException;
-import java.lang.Exception;
+import java.util.List;
+import java.util.LinkedList;
 
 public class BasicIndex implements BaseIndex {
   private static final int INT_SIZE = 4;
@@ -42,16 +43,19 @@ public class BasicIndex implements BaseIndex {
      */
     int termId = buffer.getInt();
     int freq = buffer.getInt();
-
-    /* TODO:
-     * You should create a PostingList and use buffer
-     * to fill it with docIds, then return the PostingList
-     * you created.
-     * Hint: This differs from reading in termId/freq only
-     * in the number of ints to be read in.
-     */
-
-    return null;
+    ByteBuffer bufferForDocIds = ByteBuffer.allocate(INT_SIZE * freq);
+    try {
+      numOfBytesRead = fc.read(bufferForDocIds);
+      if (numOfBytesRead == -1) return null;
+    } catch (IOException e) {
+      throw e;
+    }
+    bufferForDocIds.rewind();
+    List<Integer> postings = new LinkedList<>();
+    for (int i=0; i < freq; ++i){
+      postings.add(bufferForDocIds.getInt());
+    }
+    return new PostingList(termId,postings);
   }
 
   @Override

@@ -7,8 +7,18 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 public class Query {
 
@@ -31,10 +41,15 @@ public class Query {
    * */
   private static PostingList readPosting(FileChannel fc, int termId)
       throws IOException {
-    /*
-     * TODO: Your code here
-     */
-    return null;
+    try {
+      Long location = posDict.get(termId);
+      fc = fc.position(location);
+      PostingList result = index.readPosting(fc);
+//      System.err.println("location: "+location +", PostingList: "+result);
+      return result;
+    } catch (Throwable throwable) {
+      throw new IOException(throwable);
+    }
   }
 
   public static void main(String[] args) throws IOException {
@@ -102,15 +117,125 @@ public class Query {
 
     /* For each query */
     while ((line = br.readLine()) != null) {
-      /*
-       * TODO: Your code here
-       *       Perform query processing with the inverted index.
-       *       Make sure to print to stdout the list of documents
-       *       containing the query terms, one document file on each
-       *       line, sorted in lexicographical order.
-       */
+      Query query = new Query();
+      List<String> queryResult = query.conjunctionBinaryQuery(indexFile, line);
+      if (queryResult == null){
+        System.out.println("no results found");
+      }else{
+        Collections.sort(queryResult);
+        for (String str : queryResult) {
+          System.out.println(str);
+        }
+      }
     }
     br.close();
     indexFile.close();
+  }
+
+  private List<String> conjunctionBinaryQuery(RandomAccessFile indexFile, String query)
+      throws IOException {
+    String[] strs = query.split("\\s+");
+    Set<String> unique = new HashSet(Arrays.asList(strs));
+    ArrayList<List<Integer>> toMergeLists = new ArrayList<>(unique.size());
+    for (String str : unique){
+      PostingList postingList = lookupOneStr(str,indexFile);
+      if (postingList != null){
+        toMergeLists.add(postingList.getList());
+      }else{
+        // early exit if one of the words is non-existent
+        return null;
+      }
+    }
+    Collections.sort(toMergeLists, new Comparator<List<Integer>>() {
+      @Override
+      public int compare(List<Integer> o1, List<Integer> o2) {
+        return o1.size() - o2.size();
+      }
+    });
+    if (toMergeLists.size() == 0){
+      return null;
+    }else if (toMergeLists.size() == 1 ){
+      return translateDocIdToDocName(toMergeLists.get(0));
+    }else {
+      List<Integer> docIds = mergeIntersection(toMergeLists);
+      return translateDocIdToDocName(docIds);
+    }
+  }
+
+  private List<String> translateDocIdToDocName(List<Integer> docIds) {
+    if (docIds == null){
+      return null;
+    }
+    List<String> docNames = new ArrayList<>();
+    for (Integer docId : docIds){
+      docNames.add(docDict.get(docId));
+    }
+    return docNames;
+  }
+
+  private List<Integer> mergeIntersection(ArrayList<List<Integer>> toMergeLists) {
+    List<Integer> shortestList = null;
+    List<Integer> secondShort = null;
+    int nextShortCand = 1;
+    while(nextShortCand < toMergeLists.size()){
+      shortestList = toMergeLists.get(0);
+      secondShort = toMergeLists.get(nextShortCand++);
+//      System.err.println("Shortest: "+listToStr(shortestList));
+//      System.err.println("Second short: "+listToStr(secondShort));
+      List<Integer> tmp = bimergeIntersect(shortestList,secondShort);
+//      System.err.println("After bimerge: "+listToStr(tmp));
+      if (tmp.size() == 0){
+        return null;
+      }else{
+        toMergeLists.set(0,tmp);
+      }
+    }
+    return toMergeLists.get(0);
+  }
+  private String listToStr(List<Integer> list){
+    String postingsString = "";
+    for ( Integer posting : list){
+      postingsString +=" "+posting;
+    }
+    return postingsString;
+  }
+  private List<Integer> bimergeIntersect(List<Integer> shortestList, List<Integer> secondShort) {
+    //TODO debug this section
+    TreeSet<Integer> set = new TreeSet<>(shortestList);
+    set.retainAll(secondShort);
+    return new LinkedList<Integer>(set);
+//    List<Integer> merged = new LinkedList<>();
+//    if (shortestList.size()==0){
+//      return merged;
+//    }else{
+//
+//      Integer docId1 = null;
+//      Integer docId2 = null;
+//      Iterator<Integer> itr1 = shortestList.iterator();
+//      Iterator<Integer> itr2 = secondShort.iterator();
+//      while((itr1.hasNext() || docId1 != null) && (itr2.hasNext() || docId2 != null)){
+//        docId1 = docId1 == null ? itr1.next(): docId1;
+//        docId2 = docId2 == null ? itr2.next(): docId2;
+//        if (docId1 == docId2){
+//          merged.add(docId1);
+//          docId1 = null;
+//          docId2 = null;
+//        }else if (docId1 < docId2){
+//          docId1 = null;
+//        }else{
+//          docId2 = null;
+//        }
+//      }
+//      return merged;
+//    }
+  }
+
+  private PostingList lookupOneStr(String str, RandomAccessFile indexFile) throws IOException {
+    Integer termId = termDict.get(str);
+    if (termId == null){
+      return null;
+    }
+    FileChannel fc = indexFile.getChannel();
+    return readPosting(fc,termId);
   }
 }
