@@ -1,5 +1,6 @@
 *~
 pa1-data/*
+debug_input/*
 debug_output/*
 .DS_Store
 .classpath
