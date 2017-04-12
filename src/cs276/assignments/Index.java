@@ -53,10 +53,14 @@ public class Index {
    * */
   private static void writePosting(FileChannel fc, PostingList posting)
       throws IOException {
+    // This is hack! we need to figure out a better way. Sort should not be used.
+    Collections.sort(posting.getList());
     writePosting(fc,posting,false);
   }
   private static void writePosting(FileChannel fc, PostingList posting, boolean isLastRound)
       throws IOException {
+    // This is hack! we need to figure out a better way. Sort should not be used.
+    Collections.sort(posting.getList());
     try {
       // make sure that the doc id's are increasing
       if (isLastRound){

@@ -11,24 +11,31 @@ public class VBIndex implements BaseIndex {
   private static final int MASK = 127;
   private static final int MOD = 128;
   private static final int MOD_BITS = 7;
+  private static final int MAX_ENCODE_LENGTH = 5;
 
-  private void encodeGap(int gap, List<Byte> encoded_gap) {
+  private int encodeGap(int gap, Byte[] encoded_gap) {
     if (gap == 0) {
-      encoded_gap.add((byte)MOD);
-      return;
+      encoded_gap[0] = (byte)MOD;
+      return 1;
     }
     int counter = 0;
-    while ((gap & MASK) != 0) {
+    while (gap != 0) {
       Byte encoded_gap_part;
       if (counter == 0) {
         encoded_gap_part = (byte)(MOD | (gap & MASK));
       } else {
         encoded_gap_part = (byte)(gap & MASK);
       }
-      encoded_gap.add(0, encoded_gap_part);
+      encoded_gap[counter] =  encoded_gap_part;
       counter++;
       gap = gap >> MOD_BITS;
     }
+    for (int i = 0; i <= counter / 2 - 1; i++) {
+      Byte temp = encoded_gap[i];
+      encoded_gap[i] = encoded_gap[counter - 1 - i];
+      encoded_gap[counter - 1 - i] = temp;
+    }
+    return counter;
   }
 
   @Override
@@ -64,23 +71,19 @@ public class VBIndex implements BaseIndex {
         gap = 0;
       }
     }
-    return new PostingList(termId,postings);
+    return new PostingList(termId, postings);
   }
 
   @Override
   public void writePosting(FileChannel fc, PostingList p) throws Throwable {
-    int bb = 0;
-    if (p.getTermId() == 12) {
-      bb = 0;
-    }
     List<Byte> encoded_posting = new LinkedList<Byte>();
-    int pre_doc_id = 0 + bb;
+    int pre_doc_id = 0;
     for (int id : p.getList()) {
       int gap = id - pre_doc_id;
-      List<Byte> encoded_gap = new LinkedList<Byte>();
-      encodeGap(gap, encoded_gap);
-      for (Byte encoded_gap_part : encoded_gap) {
-        encoded_posting.add(encoded_gap_part);
+      Byte[] encoded_gap = new Byte[MAX_ENCODE_LENGTH];
+      int encoded_gap_length = encodeGap(gap, encoded_gap);
+      for (int i = 0; i < encoded_gap_length; i++) {
+        encoded_posting.add(encoded_gap[i]);
       }
       pre_doc_id = id;
     }
