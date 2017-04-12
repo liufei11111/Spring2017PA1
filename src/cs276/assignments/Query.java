@@ -200,34 +200,34 @@ public class Query {
     return postingsString;
   }
   private List<Integer> bimergeIntersect(List<Integer> shortestList, List<Integer> secondShort) {
-    //TODO debug this section
-    TreeSet<Integer> set = new TreeSet<>(shortestList);
-    set.retainAll(secondShort);
-    return new LinkedList<Integer>(set);
-//    List<Integer> merged = new LinkedList<>();
-//    if (shortestList.size()==0){
-//      return merged;
-//    }else{
-//
-//      Integer docId1 = null;
-//      Integer docId2 = null;
-//      Iterator<Integer> itr1 = shortestList.iterator();
-//      Iterator<Integer> itr2 = secondShort.iterator();
-//      while((itr1.hasNext() || docId1 != null) && (itr2.hasNext() || docId2 != null)){
-//        docId1 = docId1 == null ? itr1.next(): docId1;
-//        docId2 = docId2 == null ? itr2.next(): docId2;
-//        if (docId1 == docId2){
-//          merged.add(docId1);
-//          docId1 = null;
-//          docId2 = null;
-//        }else if (docId1 < docId2){
-//          docId1 = null;
-//        }else{
-//          docId2 = null;
-//        }
-//      }
-//      return merged;
-//    }
+//    //TODO debug this section
+//    TreeSet<Integer> set = new TreeSet<>(shortestList);
+//    set.retainAll(secondShort);
+//    return new LinkedList<Integer>(set);
+    List<Integer> merged = new LinkedList<>();
+    if (shortestList.size()==0){
+      return merged;
+    }else{
+
+      Integer docId1 = null;
+      Integer docId2 = null;
+      Iterator<Integer> itr1 = shortestList.iterator();
+      Iterator<Integer> itr2 = secondShort.iterator();
+      while((itr1.hasNext() || docId1 != null) && (itr2.hasNext() || docId2 != null)){
+        docId1 = docId1 == null ? itr1.next(): docId1;
+        docId2 = docId2 == null ? itr2.next(): docId2;
+        if (docId1.equals(docId2)){
+          merged.add(docId1);
+          docId1 = null;
+          docId2 = null;
+        }else if (docId1 < docId2){
+          docId1 = null;
+        }else{
+          docId2 = null;
+        }
+      }
+      return merged;
+    }
   }
 
   private PostingList lookupOneStr(String str, RandomAccessFile indexFile) throws IOException {
