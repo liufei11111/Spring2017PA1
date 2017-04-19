@@ -199,11 +199,15 @@ public class Query {
     }
     return postingsString;
   }
+
+  /**
+   * This function merges the two PostingLists with O(m+n). It is like merging except that it is skipping on inequality
+   * and skips the remaining items after the loop.
+   * @param PostingList
+   * @param Another PostingList
+   * @return intersection of PostingList's
+   * **/
   private List<Integer> bimergeIntersect(List<Integer> shortestList, List<Integer> secondShort) {
-//    //TODO debug this section
-//    TreeSet<Integer> set = new TreeSet<>(shortestList);
-//    set.retainAll(secondShort);
-//    return new LinkedList<Integer>(set);
     List<Integer> merged = new LinkedList<>();
     if (shortestList.size()==0){
       return merged;

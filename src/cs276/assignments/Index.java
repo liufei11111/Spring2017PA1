@@ -15,14 +15,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.TreeSet;
 
 public class Index {
 
@@ -47,8 +45,32 @@ public class Index {
   private static int wordIdCounter = 0;
   // Index
   private static BaseIndex index = null;
+  // the positional counter for the PostDic
+  private static Long postingListCounter;
+  public Index(){
+    postingListCounter = 0L;
+  }
+  /*
+ * Write a posting list to the given file
+ * You should record the file position of this posting list
+ * so that you can read it back during retrieval
+ *
+ * */
+  private static void writePosting(FileChannel fc, PostingList posting,
+      Map<Integer, Pair<Long, Integer>> postingDict, boolean isLastMergeConstructingIndex)
+      throws IOException {
+    if (isLastMergeConstructingIndex){
+      postingListCounter = fc.position();
+      postingDict.put(posting.getTermId(),new Pair<Long,Integer>(postingListCounter, posting.getList().size()));
+    }
+    try {
+      index.writePosting(fc, posting);
+    } catch (Throwable throwable) {
+      throw new IOException(throwable);
+    }
 
 
+  }
   /*
    * Write a posting list to the given file
    * You should record the file position of this posting list
@@ -181,7 +203,7 @@ public class Index {
 
     /* Required: output total number of files. */
     System.out.println(totalFileCount);
-
+    boolean isLastMergeConstructingIndex = false;
     /* Merge blocks */
     while (true) {
       if (blockQueue.size() <= 1)
@@ -189,7 +211,9 @@ public class Index {
 
       File b1 = blockQueue.removeFirst();
       File b2 = blockQueue.removeFirst();
-
+      if (blockQueue.size() == 0){
+        isLastMergeConstructingIndex = true;
+      }
       File combfile = new File(output, b1.getName() + "+" + b2.getName());
       if (!combfile.createNewFile()) {
         System.err.println("Create new block failure.");
@@ -200,7 +224,7 @@ public class Index {
       RandomAccessFile bf2 = new RandomAccessFile(b2, "r");
       RandomAccessFile mf = new RandomAccessFile(combfile, "rw");
       FileChannel combinedFC = mf.getChannel();
-      mergePostingLists(bf1.getChannel(),bf2.getChannel(),combinedFC);
+      mergePostingLists(bf1.getChannel(),bf2.getChannel(),combinedFC, postingDict, isLastMergeConstructingIndex);
 
       bf1.close();
       bf2.close();
@@ -248,7 +272,7 @@ public class Index {
       throws Throwable {
     RandomAccessFile rawRAF = new RandomAccessFile(indexFile,"r");
     FileChannel rawFC = rawRAF.getChannel();
-    polulatedPostDick(rawFC,postingDict);
+//    polulatedPostDict(rawFC,postingDict);
     List<Entry<Integer, Pair<Long, Integer>>> entryList = new ArrayList<>(postingDict.entrySet());
     Collections.sort(entryList, new Comparator<Entry<Integer, Pair<Long, Integer>>>() {
       @Override
@@ -269,18 +293,28 @@ public class Index {
     rawRAF.close();
     finalRAF.close();
   }
-
-  private static void polulatedPostDick(FileChannel combinedFC, Map<Integer, Pair<Long, Integer>> postingDict) throws Throwable {
-    combinedFC.position(0);
-    while(combinedFC.position() < combinedFC.size()){
-      Long startingPosition = combinedFC.position();
-      PostingList tmp = index.readPosting(combinedFC);
-      postingDict.put(tmp.getTermId(),new Pair<>(startingPosition,tmp.getList().size()));
-
-    }
-  }
-
-  private static void  mergePostingLists(FileChannel b1List, FileChannel b2List,FileChannel b12List)
+///**
+// * populate the PostListing Dick (note that we constuct it after the whole index is written because we think prior to a sort )
+// * as we want to order the
+// * **/
+//  private static void polulatedPostDict(FileChannel combinedFC, Map<Integer, Pair<Long, Integer>> postingDict) throws Throwable {
+//    combinedFC.position(0);
+//    while(combinedFC.position() < combinedFC.size()){
+//      Long startingPosition = combinedFC.position();
+//      PostingList tmp = index.readPosting(combinedFC);
+//      postingDict.put(tmp.getTermId(),new Pair<>(startingPosition,tmp.getList().size()));
+//
+//    }
+//  }
+/**
+ * In disk merge of two blocks of PostingLists
+ * @param b1List block 1 all the PostingList's
+ * @param b2List block 2 all the PostingList's
+ * @param postingDict
+ * @param isLastMergeConstructingIndex **/
+  private static void  mergePostingLists(FileChannel b1List, FileChannel b2List,
+      FileChannel b12List,
+      Map<Integer, Pair<Long, Integer>> postingDict, boolean isLastMergeConstructingIndex)
       throws Throwable {
     //TODO improve to no additional data structure just merge with initial block sorted and merge on the way
     List<PostingList> merged = new LinkedList<>();
@@ -296,27 +330,36 @@ public class Index {
         b2Temp = null;
       }else{
         if (b1Temp.getTermId() > b2Temp.getTermId()){
-          writePosting(b12List,b2Temp);
+//          writePosting(b12List,b2Temp);
+          writePosting(b12List,b2Temp, postingDict, isLastMergeConstructingIndex);
           b2Temp = null;
         }else{
-          writePosting(b12List,b1Temp);
+//          writePosting(b12List,b1Temp);
+            writePosting(b12List,b1Temp, postingDict, isLastMergeConstructingIndex);
           b1Temp = null;
         }
       }
     }
     if (b1Temp != null){
-      writePosting(b12List,b1Temp);
+//      writePosting(b12List,b1Temp);
+      writePosting(b12List,b1Temp, postingDict, isLastMergeConstructingIndex);
       while(b1Itr.hasNext()){
-        writePosting(b12List,b1Itr.next());
+//        writePosting(b12List,b1Itr.next());
+        writePosting(b12List,b1Itr.next(), postingDict, isLastMergeConstructingIndex);
       }
     }
     if (b2Temp != null){
-      writePosting(b12List,b2Temp);
+//      writePosting(b12List,b2Temp);
+      writePosting(b12List,b2Temp, postingDict, isLastMergeConstructingIndex);
       while(b2Itr.hasNext()){
-        writePosting(b12List,b2Itr.next());
+//        writePosting(b12List,b2Itr.next());
+        writePosting(b12List,b2Itr.next(), postingDict, isLastMergeConstructingIndex);
       }
     }
   }
+  /**
+   * Merge two PostingLists into one and it is purely in memory
+   * **/
   private static PostingList collisonForPostingLists(PostingList list1, PostingList list2) {
     List<Integer> merged = new LinkedList<>();
     List<Integer> list1itr = list1.getList();
@@ -346,22 +389,7 @@ public class Index {
     if (j<n){
       merged.addAll(list2itr.subList(j,n));
     }
-//    printList("after merge:  ", merged);
     return new PostingList(list1.getTermId(), merged);
-  }
-
-  private static List<PostingList> parsePostingList(RandomAccessFile bf1) {
-    List<PostingList> b1List = new LinkedList<>();
-    try {
-      FileChannel fc = bf1.getChannel();
-      while (fc.position() < fc.size()) {
-        b1List.add(index.readPosting(fc));
-      }
-
-    } catch (Throwable e) {
-      e.printStackTrace();
-    }
-    return b1List;
   }
 
   private static void updateTermIdToDocIdMap(Map<Integer, Set<Integer>> termIdToDocIdMap, Integer tokenId,
